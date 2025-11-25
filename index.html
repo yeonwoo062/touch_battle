@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+    <title>외계인 키우기 (수정본)</title>
+    <style>
+        /* --- 기본 --- */
+        :root{
+            --bg:#ff21b5;
+            --panel:#000000;
+            --accent:#37f137;
+            --muted:#ffffff;
+            --text:#37f137;
+            --danger:#ff1900;
+        }
+        html,body{
+            height:100%;
+            margin:0;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+        }
+        body{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:var(--bg);
+            font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+            color:var(--text);
+            user-select:none;
+            -webkit-tap-highlight-color: transparent;
+            padding:20px;
+        }
+
+        /* --- 게임 컨테이너 --- */
+        #game-container{
+            width:95%;
+            max-width:450px;
+            height:85vh;
+            min-height:600px;
+            background:var(--panel);
+            border-radius:20px;
+            border:8px solid var(--accent);
+            box-shadow:0 16px 30px rgba(0,0,0,0.55);
+            position:relative;
+            overflow:hidden;
+        }
+
+        /* --- 상단 스탯 바 --- */
+        #stats-bar{
+            position:absolute;
+            top:16px;
+            left:16px;
+            right:16px;
+            display:flex;
+            justify-content:space-between;
+            gap:10px;
+            z-index:1200; /* 최상단 */
+        }
+        .stat{ width:32%; text-align:center; }
+        .stat-name{ font-size:0.9rem; color:#bdc3c7; margin-bottom:6px; }
+        .stat-bar-container{ height:10px; background:#555; border-radius:6px; overflow:hidden; }
+        .stat-bar{ height:100%; transition:width .35s ease, background-color .35s; }
+
+        /* --- 중앙 캐릭터 영역 (반응형 중앙 배치) --- */
+        #character-area{
+            position:absolute;
+            left:50%;
+            top:50%;
+            transform:translate(-50%,-50%);
+            text-align:center;
+            width:92%;
+            max-width:360px;
+            z-index:1300; /* episode-screen 보다 위(깨짐 방지) */
+            pointer-events:none; /* 기본적으로 부모 오버레이 클릭 방해하지 않도록 none (개별 요소에서 활성화) */
+        }
+        #current-message{
+            min-height:1.4em;
+            font-weight:700;
+            margin-bottom:12px;
+            font-size:clamp(14px,2.6vw,18px);
+            color:var(--text);
+        }
+        #alien-character{
+            font-size:clamp(48px,14vw,120px);
+            margin:12px 0;
+            display:none;
+            cursor:pointer;
+            transition:transform .08s ease;
+            -webkit-user-select:none;
+            user-select:none;
+            position:relative; /* z-index 작동 위해 위치 지정 */
+            z-index:1301;
+            pointer-events:auto; /* 클릭 가능 */
+            touch-action:manipulation;
+            min-height:80px;
+            line-height:1;
+        }
+        .evolution-2{ font-size: clamp(96px, 28vw, 200px) !important; }
+
+        #click-counter{ font-size:clamp(12px,1.8vw,14px); color:#bdc3c7; margin-top:8px; }
+
+        /* --- 액션 버튼 --- */
+        #action-buttons{
+            position:absolute;
+            bottom:18px;
+            left:50%;
+            transform:translateX(-50%);
+            width:92%;
+            display:flex;
+            justify-content:space-between;
+            gap:10px;
+            z-index:1200;
+        }
+        .action-button{
+            flex:1;
+            padding:12px 10px;
+            font-size:clamp(13px,2.4vw,16px);
+            border-radius:10px;
+            border:none;
+            cursor:pointer;
+            background:#1abc9c;
+            color:#fff;
+            pointer-events:auto;
+        }
+        .action-button:disabled{ background:#7f8c8d; cursor:not-allowed; }
+
+        /* --- 오버레이 화면들 (start / episode / ending / gameover) --- */
+        .overlay {
+            position:absolute;
+            inset:0;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            flex-direction:column;
+            text-align:center;
+            padding:24px;
+            background-color:rgba(0,0,0,0.95);
+            z-index:1000; /* 낮게 둠 -> 캐릭터가 위로 나오게 */
+            transition:opacity .2s;
+        }
+        .overlay.hidden{ display:none; }
+
+        #start-screen h1{ font-size:clamp(22px,5.2vw,36px); color:#ff21b5; margin:10px 0; }
+        .start-button{
+            padding:14px 28px;
+            border-radius:10px;
+            border:none;
+            background:var(--danger);
+            color:white;
+            font-size:clamp(14px,2.4vw,18px);
+            cursor:pointer;
+            margin-top:18px;
+        }
+
+        .episode-text{ font-size:clamp(16px,3vw,20px); color:var(--text); margin-bottom:12px; }
+        .click-guide{ font-size:clamp(12px,2vw,14px); color:var(--muted); margin-top:10px; }
+
+        .warning-text{ font-size:clamp(18px,3.6vw,26px); color:var(--danger); font-weight:800; margin-bottom:16px; }
+
+        /* 진동 애니메이션 */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .shaking{ animation:shake .1s infinite; }
+
+        /* 작은 화면에서 디자인 간격 보정 */
+        @media (max-height:700px){
+            #game-container{ min-height:520px; }
+            #alien-character{ margin:6px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+
+        <!-- 스탯 바 -->
+        <div id="stats-bar">
+            <div class="stat">
+                <div class="stat-name">영양</div>
+                <div class="stat-bar-container"><div id="nutrition-bar" class="stat-bar" style="width:100%"></div></div>
+            </div>
+            <div class="stat">
+                <div class="stat-name">체력</div>
+                <div class="stat-bar-container"><div id="stamina-bar" class="stat-bar" style="width:100%"></div></div>
+            </div>
+            <div class="stat">
+                <div class="stat-name">지식</div>
+                <div class="stat-bar-container"><div id="knowledge-bar" class="stat-bar" style="width:100%"></div></div>
+            </div>
+        </div>
+
+        <!-- 중앙 캐릭터 영역 (항상 오버레이보다 위에 위치) -->
+        <div id="character-area">
+            <div id="current-message"></div>
+            <div id="alien-character" role="button" aria-label="알/외계인"></div>
+            <div id="click-counter"></div>
+        </div>
+
+        <!-- 액션 버튼 -->
+        <div id="action-buttons" style="display:none;">
+            <button id="feed-button" class="action-button">🍚 밥 주기</button>
+            <button id="play-button" class="action-button">🏃 놀아주기</button>
+            <button id="study-button" class="action-button">📚 공부하기</button>
+        </div>
+
+        <!-- 오버레이: 시작 -->
+        <div id="start-screen" class="overlay">
+            <span style="font-size:64px;">🛸</span>
+            <h1>외계인 키우기</h1>
+            <button id="start-game-button" class="start-button" style="display:none;">게임 Start</button>
+            <div class="click-guide">화면의 빈 공간(검은 배경)을 탭하면 다음으로 넘어갑니다.</div>
+        </div>
+
+        <!-- 오버레이: 에피소드 / 부화 -->
+        <div id="episode-screen" class="overlay" style="display:none;">
+            <div id="ep-text" class="episode-text"></div>
+            <div id="ep-warning" class="warning-text" style="display:none;"></div>
+            <div id="ep-egg-click-counter" class="click-guide" style="font-size:1.1em;"></div>
+            <div class="click-guide">화면의 빈 공간(검은 배경)을 탭하면 다음으로 넘어갑니다.</div>
+        </div>
+
+        <!-- 오버레이: 게임오버 -->
+        <div id="game-over-screen" class="overlay" style="display:none;">
+            <span style="font-size:64px;">💀</span>
+            <h2 style="margin:10px 0">외계인 사망...</h2>
+            <p id="death-reason" class="episode-text" style="font-size:1.1em"></p>
+            <button id="restart-button" class="start-button" style="background-color:var(--danger);">다시 시작</button>
+        </div>
+
+        <!-- 오버레이: 엔딩 -->
+        <div id="ending-screen" class="overlay" style="display:none;">
+            <span style="font-size:64px;">!축!</span>
+            <h2 id="ending-message" class="episode-text"></h2>
+            <div class="click-guide">화면의 빈 공간(검은 배경)을 탭하면 다음으로 넘어갑니다.</div>
+        </div>
+    </div>
+
+<script>
+    // --- DOM ---
+    const startScreen = document.getElementById('start-screen');
+    const episodeScreen = document.getElementById('episode-screen');
+    const epText = document.getElementById('ep-text');
+    const epWarning = document.getElementById('ep-warning');
+    const epEggClickCounter = document.getElementById('ep-egg-click-counter');
+
+    const alienCharacter = document.getElementById('alien-character');
+    const currentMessage = document.getElementById('current-message');
+    const clickCounter = document.getElementById('click-counter');
+    const actionButtons = document.getElementById('action-buttons');
+
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const deathReason = document.getElementById('death-reason');
+    const restartButton = document.getElementById('restart-button');
+
+    const endingScreen = document.getElementById('ending-screen');
+    const endingMessage = document.getElementById('ending-message');
+
+    const nutritionBar = document.getElementById('nutrition-bar');
+    const staminaBar = document.getElementById('stamina-bar');
+    const knowledgeBar = document.getElementById('knowledge-bar');
+
+    const feedButton = document.getElementById('feed-button');
+    const playButton = document.getElementById('play-button');
+    const studyButton = document.getElementById('study-button');
+
+    // --- 상태 ---
+    let gameState = 'start'; // start, episode, hatching, playing, evolving, dead, ending, ending-init
+    let stats = { nutrition:100, stamina:100, knowledge:100 };
+    let depletionInterval = null;
+    let episodeStep = 0;
+    let eggClicks = 0;
+    let evolutionStage = 1;
+    let isEvolutionInProgress = false;
+
+    const MAX_STAT = 100;
+    const DEPLETION_RATE = 9;
+    const DEPLETION_INTERVAL_MS = 50;
+    const DEPLETION_AMOUNT_PER_TICK = (DEPLETION_RATE * 0.1) / 3;
+    const EVOLUTION_TIME_SEC = 20;
+    const EVOLUTION_CLICK_COUNT = 30;
+    const HATCHING_TIME_SEC = 10;
+    const HATCHING_MIN_CLICKS = 30;
+
+    // --- 유틸: stat bar 업데이트 ---
+    function updateStatBar(statName, value){
+        const bar = document.getElementById(`${statName}-bar`);
+        bar.style.width = `${value}%`;
+        if(value < 30) bar.style.backgroundColor = '#e74c3c';
+        else if(value < 60) bar.style.backgroundColor = '#f39c12';
+        else {
+            if(statName === 'nutrition') bar.style.backgroundColor = '#2ecc71';
+            else if(statName === 'stamina') bar.style.backgroundColor = '#3498db';
+            else if(statName === 'knowledge') bar.style.backgroundColor = '#f1c40f';
+        }
+    }
+
+    function depleteStats(){
+        let deadStats = 0;
+        for(const s in stats){
+            stats[s] = Math.max(0, stats[s] - DEPLETION_AMOUNT_PER_TICK);
+            updateStatBar(s, Math.round(stats[s]));
+            if(stats[s] === 0) deadStats++;
+        }
+        if(deadStats >= 2 && gameState !== 'dead' && gameState !== 'ending-init'){
+            let reason = '';
+            if(stats.nutrition === 0 && stats.stamina === 0) reason = '영양 부족과 체력 고갈로 힘을 잃었습니다.';
+            else if(stats.nutrition === 0 && stats.knowledge === 0) reason = '영양 부족과 지식 부족으로 생명을 유지할 수 없었습니다.';
+            else if(stats.stamina === 0 && stats.knowledge === 0) reason = '체력 고갈과 지식 부족으로 버틸 수 없었습니다.';
+            endGame(reason);
+        }
+    }
+
+    // --- 게임 시작 ---
+    function startGameplay(){
+        gameState = 'playing';
+        alienCharacter.textContent = '👾';
+        alienCharacter.style.display = 'block';
+        currentMessage.textContent = '외계인을 건강하게 키워주세요!';
+        actionButtons.style.display = 'flex';
+        // 스탯 감소 시작
+        depletionInterval = setInterval(depleteStats, DEPLETION_INTERVAL_MS);
+        // 일정시간 후 진화
+        setTimeout(startEvolution, EVOLUTION_TIME_SEC * 1000);
+    }
+
+    function endGame(reason){
+        if(gameState === 'dead') return;
+        gameState = 'dead';
+        clearInterval(depletionInterval);
+        alienCharacter.textContent = '💀';
+        alienCharacter.style.cursor = 'default';
+        actionButtons.style.display = 'none';
+        deathReason.textContent = `[사망 원인]: ${reason}`;
+        gameOverScreen.style.display = 'flex';
+    }
+
+    // --- 에피소드/부화 로직 ---
+    function handleScreenClick(){
+        // 화면 클릭(배경)을 통해 다음 스텝으로 넘어가는 함수
+        if(gameState === 'hatching' || gameState === 'dead' || gameState === 'pre-hatching') return;
+        episodeStep++;
+
+        if(episodeStep === 1){
+            epText.textContent = "어느날 하늘에서 수상한 알이 떨어졌다.";
+        } else if(episodeStep === 2){
+            // 부화 시작
+            gameState = 'hatching';
+            epText.style.display = 'none';
+            epWarning.style.display = 'block';
+            epWarning.textContent = "최대한 빠르게 클릭하여 알을 부화시키세요!";
+
+            // 알 보이기
+            alienCharacter.textContent = '🥚';
+            alienCharacter.style.display = 'block';
+            alienCharacter.style.cursor = 'pointer';
+
+            // 에피소드 오버레이는 백그라운드 클릭만 받도록, 알은 위로 보이게 z-index 유지
+            // (우리는 episodeScreen 클릭 핸들러에서 event.target 체크로 배경 클릭만 허용함)
+
+            // 알 클릭 리스너 등록 (touch 포함)
+            alienCharacter.removeEventListener('click', handleEggClick);
+            alienCharacter.addEventListener('click', handleEggClick);
+            alienCharacter.removeEventListener('touchstart', handleEggClick);
+            alienCharacter.addEventListener('touchstart', handleEggClick, {passive:true});
+
+            eggClicks = 0;
+            let hatchTimeLeft = HATCHING_TIME_SEC;
+            epEggClickCounter.textContent = `남은 시간: ${hatchTimeLeft}초 / 현재 터치 횟수: ${eggClicks}회`;
+
+            const hatchTimer = setInterval(() => {
+                hatchTimeLeft--;
+                epEggClickCounter.textContent = `남은 시간: ${hatchTimeLeft}초 / 현재 터치 횟수: ${eggClicks}회`;
+
+                if(hatchTimeLeft <= 0){
+                    clearInterval(hatchTimer);
+                    alienCharacter.removeEventListener('click', handleEggClick);
+                    alienCharacter.removeEventListener('touchstart', handleEggClick);
+
+                    if(eggClicks < HATCHING_MIN_CLICKS){
+                        // 부화 실패
+                        epText.style.display = 'block';
+                        epText.textContent = `🚨 알이 깨어나지 못했습니다. 터치 횟수 ${eggClicks}회.`;
+                        epWarning.style.display = 'none';
+                        epEggClickCounter.textContent = '';
+                        setTimeout(()=> endGame(`부화 실패: 알을 ${HATCHING_MIN_CLICKS}회 미만(${eggClicks}회)으로 터치했습니다.`), 1200);
+                    } else {
+                        // 부화 성공
+                        epText.style.display = 'block';
+                        epText.textContent = `✨ 알이 부화에 성공했습니다! ✨`;
+                        alienCharacter.textContent = '👽';
+                        epWarning.style.display = 'none';
+                        epEggClickCounter.textContent = '';
+                        gameState = 'episode';
+                        episodeStep = 3;
+                    }
+                }
+            },1000);
+
+            return; // 부화상태 진입 시, 배경 클릭으로 인한 다음 스텝 진행 방지
+        } else if(episodeStep === 3){
+            epText.textContent = "외계인의 정체가 알고 싶다면 끝까지 키워주세요!";
+        } else if(episodeStep === 4){
+            // 게임 시작
+            episodeScreen.style.display = 'none';
+            epText.style.display = 'none';
+            alienCharacter.style.fontSize = ''; // 기본 크기
+            startGameplay();
+        }
+    }
+
+    function handleEggClick(e){
+        // 모바일 터치/클릭 둘 다 허용
+        if(gameState !== 'hatching') return;
+        // prevent the parent overlay from receiving this click as 'background' advance
+        e.stopPropagation && e.stopPropagation();
+        eggClicks++;
+        epEggClickCounter.textContent = `현재 터치 횟수: ${eggClicks}회`;
+
+        // 간단한 피드백 애니메이션
+        alienCharacter.style.transform = 'scale(0.92)';
+        setTimeout(()=> alienCharacter.style.transform = 'scale(1)', 90);
+    }
+
+    // --- 액션 버튼 로직 ---
+    function performAction(statName){
+        if(gameState !== 'playing' && gameState !== 'evolving') return;
+        stats[statName] = Math.min(MAX_STAT, stats[statName] + 30);
+        updateStatBar(statName, stats[statName]);
+
+        // 버튼 잠금 (간단)
+        const map = { nutrition:feedButton, stamina:playButton, knowledge:studyButton };
+        const btn = map[statName];
+        if(btn){
+            btn.disabled = true;
+            setTimeout(()=> btn.disabled = false, 3000);
+        }
+
+        currentMessage.textContent = `${statName === 'nutrition' ? '🍚 영양' : statName === 'stamina' ? '🏃 체력' : '📚 지식'} 회복!`;
+    }
+
+    feedButton.addEventListener('click', ()=>performAction('nutrition'));
+    playButton.addEventListener('click', ()=>performAction('stamina'));
+    studyButton.addEventListener('click', ()=>performAction('knowledge'));
+    // touch support for buttons
+    ['touchstart'].forEach(evt => {
+        feedButton.addEventListener(evt, ()=>performAction('nutrition'), {passive:true});
+        playButton.addEventListener(evt, ()=>performAction('stamina'), {passive:true});
+        studyButton.addEventListener(evt, ()=>performAction('knowledge'), {passive:true});
+    });
+
+    // --- 진화 및 엔딩 로직 ---
+    function startEvolution(){
+        if(isEvolutionInProgress || gameState === 'dead') return;
+        isEvolutionInProgress = true;
+        gameState = 'evolving';
+        clearInterval(depletionInterval);
+
+        clickCounter.textContent = `터치 횟수: 0/${EVOLUTION_CLICK_COUNT}`;
+        currentMessage.textContent = `✨ 진화 준비! 외계인을 ${EVOLUTION_CLICK_COUNT}회 터치하세요!`;
+
+        // 진화 클릭 리스너
+        alienCharacter.removeEventListener('click', handleEvolutionClick);
+        alienCharacter.addEventListener('click', handleEvolutionClick);
+        alienCharacter.removeEventListener('touchstart', handleEvolutionClick);
+        alienCharacter.addEventListener('touchstart', handleEvolutionClick, {passive:true});
+
+        eggClicks = 0;
+        // 20초 후 최종 엔딩 준비
+        setTimeout(startFinalEnding, EVOLUTION_TIME_SEC * 1000);
+    }
+
+    function handleEvolutionClick(e){
+        if(gameState !== 'evolving') return;
+        e.stopPropagation && e.stopPropagation();
+        eggClicks++;
+        clickCounter.textContent = `터치 횟수: ${eggClicks}/${EVOLUTION_CLICK_COUNT}`;
+
+        alienCharacter.style.transform = 'scale(0.92)';
+        setTimeout(()=> alienCharacter.style.transform = 'scale(1)', 90);
+
+        if(eggClicks >= EVOLUTION_CLICK_COUNT){
+            alienCharacter.removeEventListener('click', handleEvolutionClick);
+            alienCharacter.removeEventListener('touchstart', handleEvolutionClick);
+            evolveToNextStage();
+        }
+    }
+
+    function evolveToNextStage(){
+        evolutionStage = 2;
+        gameState = 'playing';
+        isEvolutionInProgress = false;
+
+        alienCharacter.classList.add('evolution-2');
+        currentMessage.textContent = '🎉 2단계 진화 성공! 외계인이 두 배 커졌습니다!';
+        clickCounter.textContent = '';
+        depletionInterval = setInterval(depleteStats, DEPLETION_INTERVAL_MS);
+    }
+
+    function startFinalEnding(){
+        if(gameState === 'dead') return;
+        clearInterval(depletionInterval);
+        gameState = 'ending-init';
+        currentMessage.textContent = '✨ 외계인이 마지막 진화를 준비합니다...';
+        alienCharacter.classList.add('shaking');
+        actionButtons.style.display = 'none';
+
+        setTimeout(()=>{
+            alienCharacter.classList.remove('shaking');
+            showEndingEpisode(1);
+        }, 5000);
+    }
+
+    function showEndingEpisode(step){
+        const endingTexts = [
+            "축! 외계인 성장 완료",
+            "외계인의 정체는 바로..",
+            "외계인이였습니다.. 감사합니다.. 👽"
+        ];
+        if(step >=1 && step <=3){
+            alienCharacter.style.display = 'none';
+            endingScreen.style.display = 'flex';
+            endingMessage.textContent = endingTexts[step-1];
+
+            if(step < 3){
+                // background 클릭으로 넘어가도록 (episodeScreen과 동일 방식)
+                endingScreen.onclick = (e) => {
+                    // 배경 영역 클릭만 인정 (빈 공간)
+                    if(e.target !== endingScreen) return;
+                    endingScreen.style.display = 'none';
+                    if(step+1 <= 3) showEndingEpisode(step+1);
+                };
+            } else {
+                endingScreen.onclick = null;
+            }
+        }
+    }
+
+    // --- 초기화 및 이벤트 바인딩 ---
+    function initializeGame(){
+        // 초기 UI
+        document.getElementById('episode-screen').style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        endingScreen.style.display = 'none';
+
+        alienCharacter.style.display = 'none';
+        actionButtons.style.display = 'none';
+
+        updateStatBar('nutrition',100);
+        updateStatBar('stamina',100);
+        updateStatBar('knowledge',100);
+
+        // startScreen: 배경 클릭만 반응
+        function startBackgroundClick(e){
+            if(e.target !== startScreen) return;
+            showEpisodeScreen();
+        }
+        startScreen.addEventListener('click', startBackgroundClick);
+        startScreen.addEventListener('touchstart', (e)=> { if(e.target === startScreen) { e.preventDefault(); showEpisodeScreen(); } }, {passive:false});
+
+        // episodeScreen: 배경 클릭만 반응
+        function episodeBackgroundClick(e){
+            if(e.target !== episodeScreen) return;
+            handleScreenClick();
+        }
+        episodeScreen.addEventListener('click', episodeBackgroundClick);
+        episodeScreen.addEventListener('touchstart', (e)=> { if(e.target === episodeScreen) { e.preventDefault(); handleScreenClick(); } }, {passive:false});
+
+        // restart
+        restartButton.addEventListener('click', ()=> location.reload());
+        restartButton.addEventListener('touchstart', ()=> location.reload(), {passive:true});
+    }
+
+    function showEpisodeScreen(){
+        if(gameState !== 'start') return;
+        gameState = 'episode';
+        startScreen.style.display = 'none';
+        episodeScreen.style.display = 'flex';
+
+        epText.textContent = "어느날 하늘에서 수상한 알이 떨어졌다.";
+        epText.style.display = 'block';
+        epWarning.style.display = 'none';
+        episodeStep = 1;
+    }
+
+    // --- 시작 ---
+    initializeGame();
+</script>
+</body>
+</html>
