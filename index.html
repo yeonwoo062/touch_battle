@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
     <title>외계인 키우기 (수정본)</title>
+    <script src="https://clickbattle2025.web.app/click-battle.js"></script>
     <style>
         /* --- 기본 --- */
         :root{
@@ -130,16 +131,33 @@
             position:absolute;
             inset:0;
             display:flex;
-            align-items:center;
-            justify-content:center;
+            align-items:center; /* 가로 중앙 정렬 유지 */
+            justify-content:flex-start; /* 세로 정렬을 상단부터 시작하도록 변경 */
             flex-direction:column;
             text-align:center;
             padding:24px;
             background-color:rgba(0,0,0,0.95);
-            z-index:1000; /* 낮게 둠 -> 캐릭터가 위로 나오게 */
+            z-index:1000; 
             transition:opacity .2s;
         }
         .overlay.hidden{ display:none; }
+        
+        /* 이모티콘은 중앙 상단에 위치하고 나머지 컨텐츠를 하단으로 밀어냅니다. */
+        .overlay > span[style*="font-size:64px"] {
+             margin-top: 20vh; /* 이모티콘 위치 조정 (화면 상단에서 띄움) */
+        }
+        
+        /* 텍스트와 버튼을 묶는 컨테이너: margin-top: auto로 하단으로 배치 */
+        .overlay-content-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+            margin-top: auto; /* 핵심: 이 요소가 위의 남은 공간을 모두 차지하며 하단으로 이동 */
+            padding: 0 24px;
+            padding-bottom: 30px; /* 화면 하단에서 약간 띄우기 */
+        }
 
         #start-screen h1{ font-size:clamp(22px,5.2vw,36px); color:#ff21b5; margin:10px 0; }
         .start-button{
@@ -151,6 +169,18 @@
             font-size:clamp(14px,2.4vw,18px);
             cursor:pointer;
             margin-top:18px;
+        }
+
+        /* 새로 추가된 다음 페이지 버튼 스타일 */
+        .next-page-button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid var(--accent);
+            background: rgba(55, 241, 55, 0.2); /* var(--accent) 투명 배경 */
+            color: var(--accent);
+            font-size: clamp(14px, 2.4vw, 18px);
+            cursor: pointer;
+            margin-top: 20px;
         }
 
         .episode-text{ font-size:clamp(16px,3vw,20px); color:var(--text); margin-bottom:12px; }
@@ -184,7 +214,6 @@
 <body>
     <div id="game-container">
 
-        <!-- 스탯 바 -->
         <div id="stats-bar">
             <div class="stat">
                 <div class="stat-name">영양</div>
@@ -200,54 +229,59 @@
             </div>
         </div>
 
-        <!-- 중앙 캐릭터 영역 (항상 오버레이보다 위에 위치) -->
         <div id="character-area">
             <div id="current-message"></div>
             <div id="alien-character" role="button" aria-label="알/외계인"></div>
             <div id="click-counter"></div>
         </div>
 
-        <!-- 액션 버튼 -->
         <div id="action-buttons" style="display:none;">
             <button id="feed-button" class="action-button">🍚 밥 주기</button>
             <button id="play-button" class="action-button">🏃 놀아주기</button>
             <button id="study-button" class="action-button">📚 공부하기</button>
         </div>
 
-        <!-- 오버레이: 시작 -->
         <div id="start-screen" class="overlay">
             <span style="font-size:64px;">🛸</span>
-            <h1>외계인 키우기</h1>
-            <button id="start-game-button" class="start-button" style="display:none;">게임 Start</button>
-            <div class="click-guide">화면의 빈 공간(검은 배경)을 탭하면 다음으로 넘어갑니다.</div>
+            <div class="overlay-content-bottom">
+                <h1>외계인 키우기</h1>
+                <button id="start-game-button" class="start-button" style="display:none;">게임 Start</button>
+                <button id="start-to-episode-button" class="next-page-button">다음페이지로</button>
+            </div>
         </div>
 
-        <!-- 오버레이: 에피소드 / 부화 -->
         <div id="episode-screen" class="overlay" style="display:none;">
-            <div id="ep-text" class="episode-text"></div>
-            <div id="ep-warning" class="warning-text" style="display:none;"></div>
-            <div id="ep-egg-click-counter" class="click-guide" style="font-size:1.1em;"></div>
-            <div class="click-guide">화면의 빈 공간(검은 배경)을 탭하면 다음으로 넘어갑니다.</div>
+            <div class="overlay-content-bottom">
+                <div id="ep-text" class="episode-text"></div>
+                <div id="ep-warning" class="warning-text" style="display:none;"></div>
+                <div id="ep-egg-click-counter" class="click-guide" style="font-size:1.1em;"></div>
+                <button id="episode-next-button" class="next-page-button" style="display:none;">다음페이지로</button>
+            </div>
         </div>
 
-        <!-- 오버레이: 게임오버 -->
         <div id="game-over-screen" class="overlay" style="display:none;">
             <span style="font-size:64px;">💀</span>
-            <h2 style="margin:10px 0">외계인 사망...</h2>
-            <p id="death-reason" class="episode-text" style="font-size:1.1em"></p>
-            <button id="restart-button" class="start-button" style="background-color:var(--danger);">다시 시작</button>
+            <div class="overlay-content-bottom">
+                <h2 style="margin:10px 0">외계인 사망...</h2>
+                <p id="death-reason" class="episode-text" style="font-size:1.1em"></p>
+                <button id="restart-button" class="start-button" style="background-color:var(--danger);">다시 시작</button>
+            </div>
         </div>
 
-        <!-- 오버레이: 엔딩 -->
         <div id="ending-screen" class="overlay" style="display:none;">
             <span style="font-size:64px;">!축!</span>
-            <h2 id="ending-message" class="episode-text"></h2>
-            <div class="click-guide">화면의 빈 공간(검은 배경)을 탭하면 다음으로 넘어갑니다.</div>
+            <div class="overlay-content-bottom">
+                <h2 id="ending-message" class="episode-text"></h2>
+                <button id="ending-next-button" class="next-page-button" style="display:none;">다음페이지로</button>
+            </div>
         </div>
     </div>
 
 <script>
     // --- DOM ---
+    ClickBattle.init("yeonwoo"); // 자기 닉네임
+    ClickBattle.recordClick();
+
     const startScreen = document.getElementById('start-screen');
     const episodeScreen = document.getElementById('episode-screen');
     const epText = document.getElementById('ep-text');
@@ -273,6 +307,11 @@
     const feedButton = document.getElementById('feed-button');
     const playButton = document.getElementById('play-button');
     const studyButton = document.getElementById('study-button');
+    
+    // --- 추가된 DOM 요소 ---
+    const startToEpisodeButton = document.getElementById('start-to-episode-button');
+    const episodeNextButton = document.getElementById('episode-next-button');
+    const endingNextButton = document.getElementById('ending-next-button');
 
     // --- 상태 ---
     let gameState = 'start'; // start, episode, hatching, playing, evolving, dead, ending, ending-init
@@ -326,8 +365,16 @@
         gameState = 'playing';
         alienCharacter.textContent = '👾';
         alienCharacter.style.display = 'block';
-        currentMessage.textContent = '외계인을 건강하게 키워주세요!';
+        currentMessage.textContent = '약 20초 뒤에 외계인이 진화합니다!';
         actionButtons.style.display = 'flex';
+        
+        // 🚨 [수정] 진화 안내 문구 추가
+        setTimeout(() => {
+            if(gameState === 'playing'){
+                currentMessage.textContent = '곧 외계인이 진화합니다!';
+            }
+        }, (EVOLUTION_TIME_SEC - 10) * 1000); // 10초가 남았을 때 표시
+
         // 스탯 감소 시작
         depletionInterval = setInterval(depleteStats, DEPLETION_INTERVAL_MS);
         // 일정시간 후 진화
@@ -347,12 +394,15 @@
 
     // --- 에피소드/부화 로직 ---
     function handleScreenClick(){
-        // 화면 클릭(배경)을 통해 다음 스텝으로 넘어가는 함수
+        // '다음페이지로' 버튼 클릭 시 호출
         if(gameState === 'hatching' || gameState === 'dead' || gameState === 'pre-hatching') return;
         episodeStep++;
 
+        episodeNextButton.style.display = 'none'; // 다음 스텝 진입 시 버튼 숨기기
+
         if(episodeStep === 1){
             epText.textContent = "어느날 하늘에서 수상한 알이 떨어졌다.";
+            episodeNextButton.style.display = 'block'; // 버튼 표시
         } else if(episodeStep === 2){
             // 부화 시작
             gameState = 'hatching';
@@ -364,9 +414,6 @@
             alienCharacter.textContent = '🥚';
             alienCharacter.style.display = 'block';
             alienCharacter.style.cursor = 'pointer';
-
-            // 에피소드 오버레이는 백그라운드 클릭만 받도록, 알은 위로 보이게 z-index 유지
-            // (우리는 episodeScreen 클릭 핸들러에서 event.target 체크로 배경 클릭만 허용함)
 
             // 알 클릭 리스너 등록 (touch 포함)
             alienCharacter.removeEventListener('click', handleEggClick);
@@ -403,13 +450,15 @@
                         epEggClickCounter.textContent = '';
                         gameState = 'episode';
                         episodeStep = 3;
+                        episodeNextButton.style.display = 'block'; // 다음 스텝으로 넘어갈 버튼 표시
                     }
                 }
             },1000);
 
-            return; // 부화상태 진입 시, 배경 클릭으로 인한 다음 스텝 진행 방지
+            return; // 부화상태 진입 시, 다음 스텝 진행 방지
         } else if(episodeStep === 3){
-            epText.textContent = "외계인의 정체가 알고 싶다면 끝까지 키워주세요!";
+            epText.textContent = "약 20초 뒤에 외계인을 진화시킬 수 있습니다!";
+            episodeNextButton.style.display = 'block'; // 버튼 표시
         } else if(episodeStep === 4){
             // 게임 시작
             episodeScreen.style.display = 'none';
@@ -503,7 +552,7 @@
 
         alienCharacter.classList.add('evolution-2');
         currentMessage.textContent = '🎉 2단계 진화 성공! 외계인이 두 배 커졌습니다!';
-        clickCounter.textContent = '';
+        clickCounter.textContent = '외계인의 진화를 한번만 더 도와주면 외계인의 정체를 알 수 있습니다!';
         depletionInterval = setInterval(depleteStats, DEPLETION_INTERVAL_MS);
     }
 
@@ -531,17 +580,25 @@
             alienCharacter.style.display = 'none';
             endingScreen.style.display = 'flex';
             endingMessage.textContent = endingTexts[step-1];
+            endingNextButton.style.display = 'none';
 
             if(step < 3){
-                // background 클릭으로 넘어가도록 (episodeScreen과 동일 방식)
-                endingScreen.onclick = (e) => {
-                    // 배경 영역 클릭만 인정 (빈 공간)
-                    if(e.target !== endingScreen) return;
+                endingNextButton.style.display = 'block'; // 버튼 표시
+                endingNextButton.onclick = () => {
                     endingScreen.style.display = 'none';
-                    if(step+1 <= 3) showEndingEpisode(step+1);
+                    // 이벤트 핸들러 제거
+                    endingNextButton.onclick = null; 
+                    endingNextButton.ontouchstart = null;
+                    showEndingEpisode(step+1);
                 };
-            } else {
-                endingScreen.onclick = null;
+                endingNextButton.ontouchstart = (e) => {
+                    e.preventDefault();
+                    endingScreen.style.display = 'none';
+                    // 이벤트 핸들러 제거
+                    endingNextButton.onclick = null; 
+                    endingNextButton.ontouchstart = null;
+                    showEndingEpisode(step+1);
+                };
             }
         }
     }
@@ -555,26 +612,25 @@
 
         alienCharacter.style.display = 'none';
         actionButtons.style.display = 'none';
+        
+        // 새로 추가된 버튼들 초기화
+        startToEpisodeButton.style.display = 'block';
+        episodeNextButton.style.display = 'none';
+        endingNextButton.style.display = 'none';
 
         updateStatBar('nutrition',100);
         updateStatBar('stamina',100);
         updateStatBar('knowledge',100);
 
-        // startScreen: 배경 클릭만 반응
-        function startBackgroundClick(e){
-            if(e.target !== startScreen) return;
-            showEpisodeScreen();
-        }
-        startScreen.addEventListener('click', startBackgroundClick);
-        startScreen.addEventListener('touchstart', (e)=> { if(e.target === startScreen) { e.preventDefault(); showEpisodeScreen(); } }, {passive:false});
+        // 이전의 배경 클릭 이벤트 리스너를 모두 제거하고 버튼 이벤트로 대체
+        
+        // startScreen: '다음페이지로' 버튼 클릭 시 반응
+        startToEpisodeButton.addEventListener('click', showEpisodeScreen);
+        startToEpisodeButton.addEventListener('touchstart', (e)=> { e.preventDefault(); showEpisodeScreen(); }, {passive:false});
 
-        // episodeScreen: 배경 클릭만 반응
-        function episodeBackgroundClick(e){
-            if(e.target !== episodeScreen) return;
-            handleScreenClick();
-        }
-        episodeScreen.addEventListener('click', episodeBackgroundClick);
-        episodeScreen.addEventListener('touchstart', (e)=> { if(e.target === episodeScreen) { e.preventDefault(); handleScreenClick(); } }, {passive:false});
+        // episodeScreen: '다음페이지로' 버튼 클릭 시 반응
+        episodeNextButton.addEventListener('click', handleScreenClick);
+        episodeNextButton.addEventListener('touchstart', (e)=> { e.preventDefault(); handleScreenClick(); }, {passive:false});
 
         // restart
         restartButton.addEventListener('click', ()=> location.reload());
@@ -591,6 +647,9 @@
         epText.style.display = 'block';
         epWarning.style.display = 'none';
         episodeStep = 1;
+        
+        // 첫 메시지 후 버튼을 표시하여 다음 스텝으로 이동할 수 있게 함
+        episodeNextButton.style.display = 'block'; 
     }
 
     // --- 시작 ---
